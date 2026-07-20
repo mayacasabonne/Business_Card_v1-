@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Video business card</title>
+<style>
+:root{
+  --paper:#FFFFFF;
+  --shell:#F6F5F2;
+  --line:#E3E1DC;
+  --ink:#1B1B19;
+  --muted:#8B8A83;
+  --sage:#6E8375;
+  --signal:#B8483C;
+  --pad:clamp(20px,5vw,48px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:Verdana,Geneva,sans-serif;
+  background:var(--shell);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  display:flex;justify-content:center;
+  padding:0;
+}
+.app{
+  width:100%;max-width:720px;background:var(--paper);
+  min-height:100dvh;display:flex;flex-direction:column;
+}
+.screen{display:none;flex:1;flex-direction:column;padding:var(--pad)}
+.screen.on{display:flex}
+
+.eyebrow{
+  font-size:10px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:28px;
+}
+h1{font-size:clamp(22px,4.4vw,30px);font-weight:700;line-height:1.25;letter-spacing:-.01em}
+h2{font-size:16px;font-weight:700;margin-bottom:6px}
+p{font-size:13px;line-height:1.75;color:#4A4A45;max-width:46ch}
+.lede{margin-top:18px}
+
+hr{border:0;border-top:1px solid var(--line);margin:32px 0}
+
+/* the 60-second ruler — the spine of the whole flow */
+.ruler{display:flex;gap:3px;height:6px;margin:26px 0 10px}
+.seg{flex:1;background:var(--line);position:relative;overflow:hidden;border-radius:1px}
+.seg[data-kind="optional"]{background:#EDEBE5}
+.seg .fill{position:absolute;inset:0;width:0;background:var(--sage);transition:width .1s linear}
+.ruler-legend{display:flex;justify-content:space-between;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+.list{list-style:none;margin-top:8px}
+.item{
+  border-top:1px solid var(--line);padding:18px 0;
+  display:flex;gap:16px;align-items:flex-start;
+}
+.item:last-child{border-bottom:1px solid var(--line)}
+.num{font-size:10px;letter-spacing:.14em;color:var(--muted);padding-top:3px;min-width:26px}
+.q{font-size:14px;line-height:1.6;flex:1}
+.dur{font-size:10px;letter-spacing:.12em;color:var(--muted);padding-top:4px;white-space:nowrap}
+
+.choice{cursor:pointer}
+.choice input{position:absolute;opacity:0;pointer-events:none}
+.mark{
+  width:16px;height:16px;border:1px solid var(--ink);border-radius:50%;
+  margin-top:4px;flex:0 0 auto;position:relative;
+}
+.choice input:checked + .mark::after{
+  content:"";position:absolute;inset:3px;border-radius:50%;background:var(--sage);
+}
+.choice input:focus-visible + .mark{outline:2px solid var(--sage);outline-offset:3px}
+.choice:has(input:checked) .q{font-weight:700}
+
+.actions{margin-top:auto;padding-top:36px;display:flex;gap:12px;flex-wrap:wrap}
+button{
+  font-family:inherit;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  padding:16px 26px;border:1px solid var(--ink);background:var(--ink);color:#fff;
+  cursor:pointer;border-radius:0;
+}
+button.ghost{background:transparent;color:var(--ink)}
+button:disabled{opacity:.3;cursor:not-allowed}
+button:focus-visible{outline:2px solid var(--sage);outline-offset:3px}
+
+/* capture */
+#capture{padding:0;background:var(--ink);position:relative;justify-content:center}
+video{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  transform:scaleX(-1);background:#111;
+}
+#playback{transform:scaleX(-1)}
+.overlay{position:relative;z-index:2;display:flex;flex-direction:column;height:100%;padding:var(--pad)}
+.topbar{display:flex;justify-content:space-between;align-items:center;color:#fff}
+.rec{display:flex;align-items:center;gap:9px;font-size:10px;letter-spacing:.2em;text-transform:uppercase}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--signal)}
+.rec.live .dot{animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.clock{font-size:10px;letter-spacing:.2em;color:rgba(255,255,255,.75)}
+
+.prompt{
+  margin-top:auto;background:rgba(255,255,255,.95);padding:22px 24px;
+  backdrop-filter:blur(6px);
+}
+.prompt .eyebrow{margin-bottom:10px}
+.prompt-text{font-size:16px;line-height:1.5;font-weight:700}
+.prompt .ruler{margin:18px 0 0}
+
+.countdown{
+  position:absolute;inset:0;z-index:3;background:rgba(27,27,25,.86);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#fff;
+}
+.count-num{font-size:88px;font-weight:700;line-height:1}
+.count-label{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+
+.note{font-size:11px;line-height:1.7;color:var(--muted);margin-top:14px;max-width:46ch}
+.status{font-size:11px;letter-spacing:.06em;margin-top:16px;min-height:16px}
+.status.err{color:var(--signal)}
+.status.ok{color:var(--sage)}
+.preview-wrap{border:1px solid var(--line);background:#000;aspect-ratio:9/16;max-height:46dvh;position:relative;margin-top:8px}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- 1. INTRO -->
+<section class="screen on" id="intro">
+  <div class="eyebrow">Video business card</div>
+  <h1>Sixty seconds.<br>One take.<br>The whole of you.</h1>
+  <p class="lede">Every colleague records a short spoken introduction so anyone can put a face and a voice to a name before the first meeting.</p>
+  <hr>
+  <h2>How it works</h2>
+  <p>You answer three set questions and one you choose yourself. Each question appears on screen with its own timer. Recording runs straight through — no editing, no retakes mid-way. If you're not happy with it, record again from the start.</p>
+  <p class="note">You'll need to allow camera and microphone access. Find a quiet spot with light on your face.</p>
+  <div class="actions">
+    <button id="toSelect">Choose my questions</button>
+  </div>
+</section>
+
+<!-- 2. SELECT -->
+<section class="screen" id="select">
+  <div class="eyebrow">Step 1 of 3 — Your questions</div>
+  <h2>Everyone answers these</h2>
+  <p>Fixed for all business cards, in this order.</p>
+  <ul class="list" id="mandatoryList"></ul>
+
+  <hr>
+  <h2>Pick one to close with</h2>
+  <p>Choose a single question. Leave it blank and you'll get free time at the end instead.</p>
+  <ul class="list" id="optionalList"></ul>
+
+  <div class="actions">
+    <button class="ghost" data-back="intro">Back</button>
+    <button id="toConfirm">Review my running order</button>
+  </div>
+</section>
+
+<!-- 3. CONFIRM -->
+<section class="screen" id="confirm">
+  <div class="eyebrow">Step 2 of 3 — Running order</div>
+  <h2>This is what you'll be asked</h2>
+  <p>The bar below is your minute. Each block is one question, sized to the time you get for it.</p>
+  <div class="ruler" id="confirmRuler"></div>
+  <div class="ruler-legend"><span>0:00</span><span>1:00</span></div>
+  <ul class="list" id="confirmList"></ul>
+  <div class="actions">
+    <button class="ghost" data-back="select">Change my choice</button>
+    <button id="toCapture">Open camera</button>
+  </div>
+</section>
+
+<!-- 4. CAPTURE -->
+<section class="screen" id="capture">
+  <video id="live" autoplay playsinline muted></video>
+  <div class="overlay">
+    <div class="topbar">
+      <div class="rec" id="recBadge"><span class="dot"></span><span id="recLabel">Standing by</span></div>
+      <div class="clock" id="clock">0:00 / 1:00</div>
+    </div>
+    <div class="prompt">
+      <div class="eyebrow" id="promptKind">Question 1 of 4</div>
+      <div class="prompt-text" id="promptText">—</div>
+      <div class="ruler" id="liveRuler"></div>
+    </div>
+  </div>
+  <div class="countdown" id="countdown">
+    <div class="count-num" id="countNum">5</div>
+    <div class="count-label">Recording starts</div>
+  </div>
+</section>
+
+<!-- 5. DONE -->
+<section class="screen" id="done">
+  <div class="eyebrow">Step 3 of 3 — Business card complete</div>
+  <h2>Have a look before you send it</h2>
+  <div class="preview-wrap"><video id="playback" controls playsinline></video></div>
+  <div class="status" id="status"></div>
+  <div class="actions">
+    <button class="ghost" id="retake">Record again</button>
+    <button class="ghost" id="download">Save a copy</button>
+    <button id="send">Send to SharePoint</button>
+  </div>
+</section>
+
+</div>
+
+<script>
+/* ─────────────────────────────────────────────
+   CONFIG — replace the dummy questions and the
+   SharePoint destination before rolling out.
+   ───────────────────────────────────────────── */
+const CONFIG = {
+  totalSeconds: 60,
+
+  // Dummy placeholders.
+  mandatory: [
+    { text: "Placeholder question 1 — who are you and what do you do here?", seconds: 15 },
+    { text: "Placeholder question 2 — what are you working on right now?",   seconds: 15 },
+    { text: "Placeholder question 3 — what should people come to you for?",  seconds: 15 }
+  ],
+  optional: [
+    { text: "Placeholder option A — what did you do before this?",       seconds: 15 },
+    { text: "Placeholder option B — what's the best part of your week?", seconds: 15 },
+    { text: "Placeholder option C — where can people find you?",         seconds: 15 }
+  ],
+  // Used when nobody picks an optional question.
+  freeClosing: { text: "Free time — say anything you'd like to add.", seconds: 15 },
+
+  sharepoint: {
+    // Two ways to wire this up:
+    //  1) Power Automate — paste the "When an HTTP request is received" trigger URL.
+    //  2) Graph API — an upload session URL, sent with PUT.
+    uploadUrl: "",           // e.g. "https://prod-00.westeurope.logic.azure.com/workflows/..."
+    method: "POST",          // "PUT" for a Graph upload session
+    fieldName: "file"        // form field name expected by the flow
+  }
+};
+
+/* ───────────────── state ───────────────── */
+let chosenOptional = null;   // index into CONFIG.optional, or null
+let running = [];            // the final ordered question list
+let stream = null, recorder = null, chunks = [], blob = null;
+let tickHandle = null;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const show = id => $$('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+const pad = n => String(n).padStart(2,'0');
+const clockText = s => `0:${pad(Math.floor(s))}`;
+
+function buildRunning(){
+  const closing = chosenOptional === null
+    ? { ...CONFIG.freeClosing, kind:'optional' }
+    : { ...CONFIG.optional[chosenOptional], kind:'optional' };
+  running = [...CONFIG.mandatory.map(q => ({...q, kind:'mandatory'})), closing];
+
+  // Stretch or trim the last block so the take always lands on exactly 60s.
+  const spent = running.slice(0,-1).reduce((a,q)=>a+q.seconds,0);
+  running[running.length-1].seconds = CONFIG.totalSeconds - spent;
+}
+
+/* ───────────────── screen 2 ───────────────── */
+function renderSelect(){
+  $('#mandatoryList').innerHTML = CONFIG.mandatory.map((q,i)=>`
+    <li class="item">
+      <span class="num">${pad(i+1)}</span>
+      <span class="q">${q.text}</span>
+      <span class="dur">${q.seconds}s</span>
+    </li>`).join('');
+
+  $('#optionalList').innerHTML = CONFIG.optional.map((q,i)=>`
+    <li class="item">
+      <label class="choice item" style="border:0;padding:0;width:100%">
+        <input type="radio" name="opt" value="${i}">
+        <span class="mark"></span>
+        <span class="q">${q.text}</span>
+        <span class="dur">${q.seconds}s</span>
+      </label>
+    </li>`).join('') + `
+    <li class="item">
+      <label class="choice item" style="border:0;padding:0;width:100%">
+        <input type="radio" name="opt" value="none" checked>
+        <span class="mark"></span>
+        <span class="q">No fourth question — leave me free time at the end.</span>
+        <span class="dur">15s</span>
+      </label>
+    </li>`;
+}
+
+/* ───────────────── screen 3 ───────────────── */
+function renderConfirm(){
+  buildRunning();
+  $('#confirmRuler').innerHTML = running.map(q =>
+    `<span class="seg" data-kind="${q.kind}" style="flex:${q.seconds}"><span class="fill"></span></span>`).join('');
+  $('#confirmList').innerHTML = running.map((q,i)=>`
+    <li class="item">
+      <span class="num">${pad(i+1)}</span>
+      <span class="q">${q.text}</span>
+      <span class="dur">${q.seconds}s</span>
+    </li>`).join('');
+}
+
+/* ───────────────── screen 4 ───────────────── */
+async function startCapture(){
+  show('capture');
+  $('#liveRuler').innerHTML = running.map(q =>
+    `<span class="seg" data-kind="${q.kind}" style="flex:${q.seconds}"><span class="fill"></span></span>`).join('');
+  $('#promptText').textContent = '—';
+  $('#recLabel').textContent = 'Standing by';
+  $('#recBadge').classList.remove('live');
+
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'user', width:{ideal:1080}, height:{ideal:1920} },
+      audio:{ echoCancellation:true, noiseSuppression:true }
+    });
+  }catch(err){
+    $('#countdown').innerHTML =
+      `<div class="count-label" style="max-width:30ch;text-align:center;line-height:1.9">
+         Camera blocked. Allow camera and microphone in your browser settings, then reload.
+       </div>`;
+    return;
+  }
+  $('#live').srcObject = stream;
+  runCountdown(5);
+}
+
+function runCountdown(n){
+  const cd = $('#countdown'), num = $('#countNum');
+  cd.style.display = 'flex';
+  num.textContent = n;
+  const id = setInterval(()=>{
+    n--;
+    if(n <= 0){ clearInterval(id); cd.style.display='none'; startRecording(); }
+    else num.textContent = n;
+  }, 1000);
+}
+
+function pickMime(){
+  return ['video/mp4;codecs=avc1,mp4a','video/webm;codecs=vp9,opus','video/webm']
+    .find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function startRecording(){
+  chunks = [];
+  const mimeType = pickMime();
+  recorder = new MediaRecorder(stream, mimeType ? {mimeType} : {});
+  recorder.ondataavailable = e => { if(e.data.size) chunks.push(e.data); };
+  recorder.onstop = finish;
+  recorder.start(250);
+
+  $('#recBadge').classList.add('live');
+  $('#recLabel').textContent = 'Recording';
+
+  const started = performance.now();
+  const fills = $$('#liveRuler .fill');
+
+  tickHandle = setInterval(()=>{
+    const t = (performance.now() - started) / 1000;
+    $('#clock').textContent = `${clockText(Math.min(t, CONFIG.totalSeconds))} / 1:00`;
+
+    let edge = 0, current = 0;
+    for(let i=0;i<running.length;i++){
+      const end = edge + running[i].seconds;
+      const pct = Math.max(0, Math.min(1, (t - edge) / running[i].seconds));
+      fills[i].style.width = (pct*100) + '%';
+      if(t >= edge && t < end) current = i;
+      edge = end;
+    }
+    if(t >= CONFIG.totalSeconds) current = running.length - 1;
+
+    const q = running[current];
+    if($('#promptText').textContent !== q.text){
+      $('#promptText').textContent = q.text;
+      $('#promptKind').textContent =
+        `${q.kind === 'mandatory' ? 'Set question' : 'Your question'} ${current+1} of ${running.length}`;
+    }
+
+    if(t >= CONFIG.totalSeconds) stopRecording();
+  }, 100);
+}
+
+function stopRecording(){
+  clearInterval(tickHandle);
+  if(recorder && recorder.state !== 'inactive') recorder.stop();
+}
+
+function finish(){
+  blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+  stream.getTracks().forEach(t => t.stop());
+  $('#playback').src = URL.createObjectURL(blob);
+  $('#status').textContent = '';
+  $('#status').className = 'status';
+  $('#send').disabled = false;
+  show('done');
+}
+
+/* ───────────────── sending ───────────────── */
+function filename(){
+  const ext = (blob.type.includes('mp4')) ? 'mp4' : 'webm';
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  return `business-card-${stamp}.${ext}`;
+}
+
+async function send(){
+  const s = $('#status');
+  if(!CONFIG.sharepoint.uploadUrl){
+    s.className = 'status err';
+    s.textContent = 'No destination set. Add your SharePoint upload URL to CONFIG at the top of this file.';
+    return;
+  }
+  $('#send').disabled = true;
+  s.className = 'status';
+  s.textContent = 'Sending…';
+  try{
+    let res;
+    if(CONFIG.sharepoint.method === 'PUT'){
+      res = await fetch(CONFIG.sharepoint.uploadUrl, {
+        method:'PUT',
+        headers:{ 'Content-Type': blob.type },
+        body: blob
+      });
+    }else{
+      const fd = new FormData();
+      fd.append(CONFIG.sharepoint.fieldName, blob, filename());
+      res = await fetch(CONFIG.sharepoint.uploadUrl, { method:'POST', body: fd });
+    }
+    if(!res.ok) throw new Error(res.status);
+    s.className = 'status ok';
+    s.textContent = 'Sent. Your business card is in the shared folder.';
+  }catch(err){
+    s.className = 'status err';
+    s.textContent = 'Sending failed. Save a copy and try again, or send it to the team folder manually.';
+    $('#send').disabled = false;
+  }
+}
+
+/* ───────────────── wiring ───────────────── */
+$('#toSelect').onclick = () => { renderSelect(); show('select'); };
+$('#toConfirm').onclick = () => {
+  const v = document.querySelector('input[name=opt]:checked').value;
+  chosenOptional = v === 'none' ? null : Number(v);
+  renderConfirm(); show('confirm');
+};
+$('#toCapture').onclick = startCapture;
+$$('[data-back]').forEach(b => b.onclick = () => show(b.dataset.back));
+$('#retake').onclick = () => { blob = null; show('confirm'); };
+$('#download').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename(); a.click();
+};
+$('#send').onclick = send;
+</script>
+</body>
+</html>
